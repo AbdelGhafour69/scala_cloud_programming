@@ -10,6 +10,7 @@ object Messages {
   case class Delete(key: String)
   case class Start(ar: ActorRef)
   case class LookupResponse(value: String, store: ActorRef)
+  case class LookupError(value: String, store: ActorRef)
 
 }
 
