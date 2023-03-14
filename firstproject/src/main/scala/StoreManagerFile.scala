@@ -3,17 +3,9 @@ import scala.util.Random._
 import scala.collection.mutable.HashMap
 import scala.io.StdIn.readLine
 import scala.util.control.Breaks._
+import java.io._
 
-object Messages {
-  case class Store(key: String, value: String)
-  case class Lookup(key: String, ar: ActorRef)
-  case class Delete(key: String)
-  case class Start(ar: ActorRef)
-  case class LookupResponse(value: String, store: ActorRef)
-
-}
-
-class User extends Actor {
+class UserFile extends Actor {
   import Messages._
   override def receive: Receive = {
 
@@ -61,29 +53,32 @@ class User extends Actor {
   }
 }
 
-class Store_Manager extends Actor {
-  val map = scala.collection.mutable.HashMap.empty[String, String]
+class StoreManager extends Actor {
 
   import Messages._
 
   override def receive: Receive = {
     case Store(key: String, value: String) =>
-      map += key -> value
-      println(map)
+      add_to_file("Store " + key + " " + value + "\n")
     case Delete(key: String) =>
-      map -= key
-      println(map)
+      add_to_file("Delete " + key + "\n")
     case Lookup(key: String, user: ActorRef) =>
-      user ! LookupResponse(map(key), self)
+      print()
+  }
+  def add_to_file(action: String) = {
+    val fw = new FileWriter("../actions.txt", true)
+    try {
+      fw.write(action)
+    } finally fw.close()
   }
 }
 
-object File_System extends App {
+object StoreManagerFile extends App {
   import Messages._
 
-  val as = ActorSystem("File_System")
-  val store = as.actorOf(Props[Store_Manager], "Store_manager")
-  val qa = as.actorOf(Props[User], "User")
+  val as = ActorSystem("FileSystem")
+  val store = as.actorOf(Props[StoreManager], "StoreManager")
+  val qa = as.actorOf(Props[UserFile], "User")
   qa ! Start(store)
 
 }
