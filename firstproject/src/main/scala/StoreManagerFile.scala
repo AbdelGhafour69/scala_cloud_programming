@@ -5,6 +5,11 @@ import scala.io.StdIn.readLine
 import scala.util.control.Breaks._
 import java.io._
 import scala.io.Source
+import scala.concurrent.Await
+import akka.pattern.ask
+import akka.util.Timeout
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class UserFile extends Actor {
   import Messages._
@@ -58,45 +63,27 @@ class UserFile extends Actor {
 }
 
 class StoreManager extends Actor {
-
   import Messages._
+
+  val ma = context.actorOf(Props[CacheAgent], "CacheAgent")
+  implicit val to = Timeout(10 seconds)
 
   override def receive: Receive = {
     case Store(key: String, value: String) =>
-      add_to_file("Store " + key + " " + value + "\n")
+      val future = (ma ? Store(key, value))
+      Await.result(future, 1 seconds)
+
     case Delete(key: String) =>
-      add_to_file("Delete " + key + "\n")
+      val future = (ma ? Delete(key))
+      Await.result(future, 1 seconds)
+
     case Lookup(key: String, user: ActorRef) =>
-      val filename = "../actions.txt"
-      val lines = Source.fromFile(filename).getLines().toSeq.reverse
-      val found = false
-      breakable {
-        lines.foreach(line => {
-          // Do something with the line
-          val splitline: List[String] = line.split(" ").map(_.trim).toList
-          if (splitline(1).equals(key) && splitline(0).equals("Store")) {
-
-            user ! LookupResponse(splitline(2), self)
-            found -> true
-            break
-          }
-          if (splitline(1).equals(key)) {
-            user ! LookupError(s"File with key $key was deleted !", self)
-            found -> true
-            break
-          }
-        })
-        if (found == false) {
-          user ! LookupError("File not found !", self)
-        }
+      val future = (ma ? Lookup(key, self))
+      val res = Await.result(future, 5 seconds)
+      res match {
+        case LookupError(value, ar)    => sender ! LookupError(value, self)
+        case LookupResponse(value, ar) => sender ! LookupResponse(value, self)
       }
-
-  }
-  def add_to_file(action: String) = {
-    val fw = new FileWriter("../actions.txt", true)
-    try {
-      fw.write(action)
-    } finally fw.close()
   }
 }
 
@@ -105,7 +92,9 @@ object StoreManagerFile extends App {
 
   val as = ActorSystem("FileSystem")
   val store = as.actorOf(Props[StoreManager], "StoreManager")
-  val qa = as.actorOf(Props[UserFile], "User")
+  // val qa = as.actorOf(Props[UserFile], "User")
+  val qa = as.actorOf(Props[RandomUser], "User")
+  qa ! Populate()
   qa ! Start(store)
 
 }

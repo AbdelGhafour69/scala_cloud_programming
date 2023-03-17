@@ -3,6 +3,7 @@ import scala.util.Random._
 import scala.collection.mutable.HashMap
 import scala.io.StdIn.readLine
 import scala.util.control.Breaks._
+import java.net.CacheResponse
 
 object Messages {
   case class Store(key: String, value: String)
@@ -11,6 +12,9 @@ object Messages {
   case class Start(ar: ActorRef)
   case class LookupResponse(value: String, store: ActorRef)
   case class LookupError(value: String, store: ActorRef)
+  case class CacheLookup(key: String, store: ActorRef, user: ActorRef)
+  case class CreateMapAgent()
+  case class Populate()
 
 }
 
